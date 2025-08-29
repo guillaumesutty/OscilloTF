@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from scipy.stats import pearsonr
+
+#plt.style.use("nature.mplstyle") #use Nature style
 
 def plot_CV_results(lambda_values, MSE_train_all, MSE_test_all, metrics="MSE", filename="plot.png", plot_mean=True, ylim=False):
     """ Plots the results of the 5-fold cross-validation for different lambda values. """
@@ -49,31 +52,36 @@ def plot_target(rates, process, theta, name: str):
     plt.show()
 
 
-def plot_rate_comparison(names, rates, reconstructed_rates, process, theta, target_nb=1):
+def plot_rate_comparison(names, rates, reconstructed_rates, process, theta, target_nb=1, std_a=None, std_R=None):
     """ Compares the process rates inferred from experimental data with reconstructed data from activities """
+    if std_a is None:
+        std_a = np.zeros_like(rates[target_nb, :])
+    if std_R is None:
+        std_R = np.zeros_like(reconstructed_rates[target_nb, :])
     plt.figure(figsize=(6, 4))
-    plt.title(names[target_nb] + " " + process[0] + " rate along cell cycle")
+    plt.title(names[target_nb])
     plt.xlabel("\u03B8")
     plt.ylabel("Transcription rate (mean-centered)")
     #plt.ylim(-0.75, 0.75)
     plt.plot(theta,rates[target_nb,:], label="scRNA-seq", color="green")
     plt.plot(theta,reconstructed_rates[target_nb,:], label="Reconstructed", color="red")
+    plt.fill_between(theta, rates[target_nb,:]-std_a, rates[target_nb,:]+std_a, color="green", alpha=0.2, edgecolor=None)
+    plt.fill_between(theta, reconstructed_rates[target_nb,:]-std_R, reconstructed_rates[target_nb,:]+std_R, color="red", alpha=0.2, edgecolor=None)
     plt.legend()
     plt.show()
 
 
-def plot_binding_protein_activity(names, activities, process, theta, BP_nb=1):
+def plot_binding_protein_activity(names, activities, process, theta, BP_nb=1, std=None):
     """ Shows the inferred activity of a binding protein (TF, RBP) """
+    A = activities[BP_nb,:]
+    if std is None:
+        std = np.zeros_like(A)
     plt.figure(figsize=(6, 4))
-    plt.title(names[BP_nb] + " activity on " + process[0] + " throughout the cell cycle")
+    plt.title(names[BP_nb])
     plt.xlabel("\u03B8")
     plt.ylabel("Activity (mean-centered)")
-    if (isinstance(activities, list)):
-        for activity in activities:
-            plt.plot(theta,activity[0][BP_nb,:], label=activity[1])
-        plt.legend()
-    else:
-        plt.plot(theta,activities[BP_nb,:], color="green")
+    plt.plot(theta,A, color="green")
+    plt.fill_between(theta, A-std, A+std, color="green", alpha=0.2, edgecolor=None)
     plt.show()
 
 
@@ -100,27 +108,25 @@ def plot_heatmap(activity, ylabels=None, display_limit=None, cmap='RdBu_r', titl
     H = (H-H.mean(axis=1,keepdims=True))/H.std(axis=1,keepdims=True) #Normalization
     plt.figure(figsize=(8, 6))  # Adjust the figure size as needed
     if (title != ""):
-        plt.title("Heatmap of " + title)
-    else:
-        plt.title("Heatmap of transcription factors activities",fontsize=14)
+        plt.title(title)
     ax = sns.heatmap(H, cmap=cmap, cbar=True, annot=False, yticklabels=ylabels,xticklabels=False)
 
     # Add vertical dashed lines at positions theta1 and theta2
     theta1 = 25 #G1 -> S
     theta2 = 63 #S -> G2/M
-    ax.axvline(x=theta1, color=[0.7,0.7,0.7], linestyle='--', linewidth=3)
-    ax.axvline(x=theta2, color=[0.7,0.7,0.7], linestyle='--', linewidth=3 )
+    ax.axvline(x=theta1, color=[0.7,0.7,0.7], linestyle='--', linewidth=4)
+    ax.axvline(x=theta2, color=[0.7,0.7,0.7], linestyle='--', linewidth=4)
 
     # Set ticks and labels for the subset
     ax.set_xticks(np.linspace(0,100,11));  # Specify tick positions
     thetalabels = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
-    ax.set_xticklabels(thetalabels,fontsize=14);  # Set tick labels
-    ax.tick_params(axis='y', labelsize=14)
+    ax.set_xticklabels(thetalabels);#,fontsize=14);  # Set tick labels
+    ax.tick_params(axis='y')#, labelsize=12)
 
     # Label
-    ax.set_xlabel('Cell-cycle phase', fontsize=14)  # Adjust fontsize as needed
+    ax.set_xlabel('Cell-cycle phase')#, fontsize=14)  # Adjust fontsize as needed
     cbar = ax.collections[0].colorbar
-    cbar.set_label('Activity (z-score)', fontsize=14)  # Adjust label as needed
+    cbar.set_label('Activity (z-score)')#, fontsize=14)  # Adjust label as needed
 
     #plt.savefig("heatmap_degradation.png")  # Save as PNG
     #plt.savefig("heatmap_degradation.pdf")  # Save as PDF
@@ -140,7 +146,7 @@ def plot_heatmap_list(A, tf_names, ylabels, clip=False):
     if clip:
         H = np.clip(H, -2, 2) #Prevent outlier to distort the color scale
     plt.figure(figsize=(8, 6))  # Adjust the figure size as needed
-    plt.title("Heatmap of transcription factors activities")
+    #plt.title("Heatmap of transcription factors activities")
     ax = sns.heatmap(H, cmap='RdBu_r', cbar=True, annot=False, yticklabels=ylabels,xticklabels=False)
 
     # Add vertical dashed lines at positions theta1 and theta2
@@ -152,13 +158,13 @@ def plot_heatmap_list(A, tf_names, ylabels, clip=False):
     # Set ticks and labels for the subset
     ax.set_xticks(np.linspace(0,100,11));  # Specify tick positions
     thetalabels = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
-    ax.set_xticklabels(thetalabels,fontsize=14);  # Set tick labels
-    ax.tick_params(axis='y', labelsize=12)
+    ax.set_xticklabels(thetalabels);#,fontsize=14);  # Set tick labels
+    ax.tick_params(axis='y')#, labelsize=12)
 
     # Label
-    ax.set_xlabel('Cell-cycle phase', fontsize=14)  # Adjust fontsize as needed
+    ax.set_xlabel('Cell-cycle phase')#, fontsize=14)  # Adjust fontsize as needed
     cbar = ax.collections[0].colorbar
-    cbar.set_label('Activity (z-score)', fontsize=14)  # Adjust label as needed
+    cbar.set_label('Activity (z-score)')#, fontsize=14)  # Adjust label as needed
 
     #plt.savefig("heatmap_degradation.png")  # Save as PNG
     #plt.savefig("heatmap_degradation.pdf")  # Save as PDF
@@ -167,8 +173,13 @@ def plot_heatmap_list(A, tf_names, ylabels, clip=False):
     return ylabels
 
 
-def plot_TF_exp_activity(theta_smooth, alpha, A, tf_names, key_tfs, tf):
+def plot_TF_exp_activity(theta_smooth, alpha, A, tf_names, key_tfs, tf, std1=None, std2=None):
     
+    if std1 is None:
+        std1 = np.zeros_like(alpha[tf, :])
+    if std2 is None:
+        std2 = np.zeros_like(A[list(tf_names).index(key_tfs[tf]), :])
+
     fig, ax1 = plt.subplots(figsize=(6, 4))
 
     # Plot TF expression on the left y-axis
@@ -176,6 +187,7 @@ def plot_TF_exp_activity(theta_smooth, alpha, A, tf_names, key_tfs, tf):
     ax1.set_ylabel("TF Expression (α)", color='tab:red')
     
     line1, = ax1.plot(theta_smooth, alpha[tf], color='tab:red', label="snRNA-seq")
+    ax1.fill_between(theta_smooth, alpha[tf]-std1, alpha[tf]+std1, color="red", alpha=0.2, edgecolor=None)
 
     ax1.tick_params(axis='y')
 
@@ -184,6 +196,7 @@ def plot_TF_exp_activity(theta_smooth, alpha, A, tf_names, key_tfs, tf):
     ax2.set_ylabel("TF Activity (A)", color='tab:green')
     
     line2, = ax2.plot(theta_smooth, A[list(tf_names).index(key_tfs[tf])], color='tab:green', label="TF activity")
+    ax2.fill_between(theta_smooth, A[list(tf_names).index(key_tfs[tf])]-std2, A[list(tf_names).index(key_tfs[tf])]+std2, color="green", alpha=0.2, edgecolor=None)
     
     ax2.tick_params(axis='y')
 
@@ -375,33 +388,80 @@ def compute_reproducibility(A_star1, A_star2, alpha1_norm, alpha2_norm, metric="
     print("Median correlation of "+ metric +":     ", round(np.median(corrs_A), 3))
     
     
-def W_key_TF(W, tf_names, top_k=20, neg=True):
-    # --- Step 1: Compute importance and sort ---
-    tf_importance = np.sum(np.abs(W), axis=0)  # (n_tfs,)
-    sorted_idx = np.argsort(tf_importance)[::-1]
-
-    # --- Step 2: Select top 20 TFs ---
-    top_idx = sorted_idx[:top_k]
-    top_tf_names = [tf_names[i] for i in top_idx]
-
-    # --- Step 3: Compute positive and negative weight sums ---
-    pos_sums = np.array([W[:, i][W[:, i] > 0].sum() for i in top_idx])
-
-    # --- Step 4: Plot ---
-    plt.figure(figsize=(9, 5))
-    x = np.arange(top_k)
-
-    # Bars: positive up, negative down
-    plt.bar(x, pos_sums, color='red', label='Positive W')
-    if (neg):
-        neg_sums = np.array([W[:, i][W[:, i] < 0].sum() for i in top_idx])  # note: negative values
-        plt.bar(x, neg_sums, color='blue', label='Negative W')
-
-    # TF labels
-    plt.xticks(x, top_tf_names, rotation=45, ha='right')
+def W_key_TF(W, tf_names, top_k=20, y_bars=None):
+    # --- Step 1: Compute total weight per TF (W is >= 0) ---
+    tf_importance = np.sum(W, axis=0)  # shape: (n_tfs,)
+    
+    # --- Step 2: Create and sort DataFrame ---
+    df = pd.DataFrame({'sum_W': tf_importance}, index=tf_names)
+    df = df.sort_values('sum_W', ascending=False)
+    
+    # --- Step 3: Plot top_k TFs ---
+    top_df = df.head(top_k)
+    
+    #plt.figure(figsize=(9, 5))
+    plt.bar(np.arange(top_k), top_df['sum_W'], yerr=y_bars, color='red')
+    plt.xticks(np.arange(top_k), top_df.index, rotation=45, ha='right')
     plt.ylabel("Sum of W across genes")
-    plt.title("Top 20 TFs by ∑|W| (After amplitude standardization)")
+    #plt.title(f"Top {top_k} TFs by ∑W (After amplitude standardization)")
     plt.axhline(0, color='black', linewidth=0.8)
-    plt.legend()
     plt.tight_layout()
     plt.show()
+
+    # --- Step 4: Print top TF names ---
+    print(list(top_df.index))
+
+    # --- Step 5: Return full sorted DataFrame ---
+    return df
+
+def W_key_targets_per_TF(W, tf, targetnames, top_k=20, y_bars=None):
+    # --- Step 1: Compute total weight per TF (W is >= 0) ---
+    tf_importance = np.sum(W, axis=0)  # shape: (n_tfs,)
+    
+    # --- Step 2: Create and sort DataFrame ---
+    df = pd.DataFrame({'sum_W': tf_importance}, index=tf_names)
+    df = df.sort_values('sum_W', ascending=False)
+    
+    # --- Step 3: Plot top_k TFs ---
+    top_df = df.head(top_k)
+    
+    #plt.figure(figsize=(9, 5))
+    plt.bar(np.arange(top_k), top_df['sum_W'], yerr=y_bars, color='red')
+    plt.xticks(np.arange(top_k), top_df.index, rotation=45, ha='right')
+    plt.ylabel("Sum of W across genes")
+    #plt.title(f"Top {top_k} TFs by ∑W (After amplitude standardization)")
+    plt.axhline(0, color='black', linewidth=0.8)
+    plt.tight_layout()
+    plt.show()
+
+    # --- Step 4: Print top TF names ---
+    print(list(top_df.index))
+
+    # --- Step 5: Return full sorted DataFrame ---
+    return df
+
+def W_key_gene(W, gene_names, top_k=20):
+    # --- Step 1: Compute total weight per gene ---
+    gene_importance = np.sum(W, axis=1)  # shape: (n_genes,)
+    
+    # --- Step 2: Create and sort DataFrame ---
+    df = pd.DataFrame({'sum_W': gene_importance}, index=gene_names)
+    df = df.sort_values('sum_W', ascending=False)
+    
+    # --- Step 3: Plot top_k genes ---
+    top_df = df.head(top_k)
+    
+    plt.figure(figsize=(9, 5))
+    plt.bar(np.arange(top_k), top_df['sum_W'], color='red')
+    plt.xticks(np.arange(top_k), top_df.index, rotation=45, ha='right')
+    plt.ylabel("Sum of W across TFs")
+    #plt.title(f"Top {top_k} Genes by ∑W (After amplitude standardization)")
+    plt.axhline(0, color='black', linewidth=0.8)
+    plt.tight_layout()
+    plt.show()
+
+    # --- Step 4: Print top gene names ---
+    #print(list(top_df.index))
+
+    # --- Step 5: Return full sorted DataFrame ---
+    return df
